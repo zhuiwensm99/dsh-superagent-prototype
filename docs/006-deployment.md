@@ -21,7 +21,8 @@ Both presets run with `danger-full-access` as the operator's OS user and read me
 ## Prerequisites
 
 - Node.js 22.19+ or 24+, pnpm, git 2.32+, Python 3.8+ and tmux
-- GitHub CLI (`gh`) 2.48 or later. Source CLI fields must point to `gh` or `lark-cli` wrappers; the host relies on their subcommands and output formats.
+- `gh`, `tmux` and `dsh` on `PATH`. `scripts/dsh-superagent start` runs `dsh` in a `tmux` session and the GitHub Source shells out to `gh`; a tool installed but absent from `PATH` fails at start, and a missing `tmux` is the most common cause.
+- GitHub CLI (`gh`) 2.48 or later, signed in with the `repo` and `notifications` scopes. Source CLI fields must point to `gh` or `lark-cli` wrappers; the host relies on their subcommands and output formats. Without `notifications`, the Source's poll of the agent account's notifications keeps answering 403; without `repo`, setup cannot see push access.
 - A repository on github.com; GitHub Enterprise Server is not supported. To create a checkout per Ticket, keep a local clone from which the prepare command can add worktrees. Install `git-lfs` if that repository uses Git LFS.
 - A model provider configured for DeepSeek Harness. dsh-superagent uses the profile's default model unless the Eval or Execution settings name another.
 - For Feishu: `lark-cli` (tested with 1.0.90) and a Feishu or Lark app with a bot
@@ -30,7 +31,7 @@ Both presets run with `danger-full-access` as the operator's OS user and read me
 
 ### Agent GitHub account
 
-1. Create a GitHub user account for the agent and give it write access to the repository. A GitHub App cannot be the agent, because dsh-superagent reads the account's notifications.
+1. Create a GitHub user account for the agent and give it write access to the repository. It must differ from the account that sends the requests, usually the operator's: GitHub does not notify an account of a mention written by that same account, so a shared account would never see a request. A GitHub App cannot be the agent, because dsh-superagent reads the account's notifications.
 2. Give it a GitHub CLI that uses only its own credentials:
 
    ```sh
@@ -40,11 +41,12 @@ Both presets run with `danger-full-access` as the operator's OS user and read me
    GH_CONFIG_DIR="$HOME/.config/gh-agent" exec gh "$@"
    EOF
    chmod +x ~/.local/bin/gh-agent
-   gh-agent auth login
+   gh-agent auth login -s repo,notifications
    gh-agent api user --jq .login
+   gh-agent auth status
    ```
 
-   Sign in as the agent account; the last command prints its login. dsh-superagent reads the login the same way.
+   Sign in as the agent account; the `api user` command prints its login. dsh-superagent reads the login the same way. `-s notifications` adds the scope the notification poll needs; `gh` requests `repo` by default. `auth status` shows the scopes the token holds.
 
 ### Feishu bot (optional)
 
