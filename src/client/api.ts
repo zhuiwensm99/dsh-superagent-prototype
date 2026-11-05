@@ -1,9 +1,9 @@
-/** Same-origin client and polling hook for the orchestrator management API. */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Api, ApiRequest, ApiResponse } from '../app/api.ts'
 import { USER_ERRORS, type UserErrorCode } from '../core/errors.ts'
 import type { TicketStage } from '../core/stage.ts'
 import type { SetupProblem } from '../setup.ts'
+import type { SessionSummary } from '../app/api.ts'
 
 /** Host rejection identified by a structured user error code and interpolation values. */
 export interface UserFailure { code: UserErrorCode; values: Record<string, string> }
@@ -117,6 +117,8 @@ export function caller(messages: () => ApiMessages): Call {
 }
 
 export type StateView = ApiResponse<'GET state'>
+export type SessionListView = ApiResponse<'GET sessions'>
+export type SessionRow = SessionListView['sessions'][number]
 export type SetupView = StateView['setup']
 export type SettingsView = ApiResponse<'GET settings'>
 export type Settings = { [B in keyof SettingsView['blocks']]: SettingsView['blocks'][B]['value'] }

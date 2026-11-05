@@ -5,7 +5,9 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { z } from 'zod'
 import { THREAD_FILTERS, TICKET_FILTERS, type Api, type ApiResponse, type RouteParams } from './api.ts'
 import { sourceSkills } from './context.ts'
-import type { ModelCatalog } from '@deepseek-ai/dsh-api-session-controller/types'
+import type { ModelCatalog, SessionListValue, SessionSummary } from '@deepseek-ai/dsh-api-session-controller/types'
+import type { SessionId } from '@deepseek-ai/dsh-session'
+import type { SessionInspection } from '@deepseek-ai/dsh-session-persistence'
 import { PromptConflict, SKILL_NAME, SKILL_PREFIX, TEAM_SECTIONS, builtInBase, builtInParts, defaultPrompts, savePrompts, type Prompts }
   from './prompts.ts'
 import { policyVersion } from '../policy.ts'
@@ -28,6 +30,11 @@ import { sourcesStatus, type SetupState } from './views/sources.ts'
 import { decisionList, search, threadDetail, threadList } from './views/threads.ts'
 import { executorLoad, ticketDetail, ticketList } from './views/tickets.ts'
 
+interface SessionControllerApi {
+  list(signal?: AbortSignal): Promise<SessionListValue>
+  inspect(sessionId: SessionId): Promise<SessionInspection>
+}
+
 export interface HttpHost {
   readonly store: Store
   /** Feishu message links resolved since startup, used by search to match AppLink URLs. */
@@ -36,6 +43,7 @@ export interface HttpHost {
   readonly prompts: Pick<Prompts, 'current' | 'version' | 'history' | 'preview' | 'save' | 'defaultChanged'>
   readonly sessions: Pick<Sessions, 'status' | 'notify' | 'delivery'>
   readonly settings: Pick<Settings, 'view' | 'save' | 'pause' | 'sync' | 'refreshLabels'>
+  readonly sessionController: SessionControllerApi
   readonly engine: EngineForPeople
   readonly executor: Pick<DshExecutor, 'activeCount'>
   readonly health: Record<string, Health>
@@ -131,6 +139,13 @@ function promptsView(runtime: HttpHost, revision: number | undefined, offset: nu
 }
 export type PromptsView = ReturnType<typeof promptsView>
 
+/** Builds a read-only snapshot of all DSH workspace sessions for supervision. */
+async function sessionsList(runtime: HttpHost): Promise<{ sessions: SessionSummary[]; status: string }> {
+  const listed = await runtime.sessionController.list()
+  const sessions = Array.isArray(listed) ? [...listed] : [...listed.items]
+  return { sessions, status: 'done' }
+}
+
 interface Input<K extends keyof Api> {
   params: RouteParams<K>; query: Record<string, string>; body: (maxBytes?: number) => Promise<unknown>
 }
@@ -192,6 +207,7 @@ function routes(runtime: HttpHost): Routes {
     'GET tickets/:id': ({ params }) => ticketPage(runtime, params.id),
     'POST tickets/:id/retry': ({ params }) => { const id = ticket(params.id); runtime.engine.retryTicket(id); return { retried: true } },
     'POST tickets/:id/stop': ({ params }) => { const id = ticket(params.id); runtime.engine.stopTicket(id); return { stopped: true } },
+    'GET sessions': () => sessionsList(runtime),
     'POST executor/pause': async ({ body }) => runtime.settings.pause(z.object({ paused: z.boolean() }).parse(await body()).paused, 'panel'),
     'PUT settings/:block': async ({ params, body }) => {
       const block = SettingsBlockSchema.parse(params.block)

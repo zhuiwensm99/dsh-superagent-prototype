@@ -1,5 +1,7 @@
 /** Type-only management API contract between the web panel and host routes, imported by the panel without bundling host code. */
-import type { ModelCatalog } from '@deepseek-ai/dsh-api-session-controller/types'
+import type { ModelCatalog, SessionSummary } from '@deepseek-ai/dsh-api-session-controller/types'
+
+export type { SessionSummary }
 import type { PromptConfig, Prompts } from './prompts.ts'
 import type { PromptsView, StateView, TicketPageView } from './http.ts'
 import type { HistoryView } from './settings-history.ts'
@@ -36,6 +38,7 @@ export interface Api {
   'POST tickets/:id/stop': { response: { stopped: true } }
   'POST executor/pause': { body: { paused: boolean }; response: { paused: boolean } }
   'PUT settings/:block': { body: { value: unknown; revision: number }; response: { revision: number; restarting: boolean } }
+  'GET sessions': { response: { sessions: SessionSummary[]; status: string } }
   'GET policy/history': { response: HistoryView }
   'POST policy-sync/:id': { response: { policy: unknown } }
   'POST setup/check': { response: { restarting: true } }
